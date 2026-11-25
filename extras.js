@@ -24,7 +24,7 @@ const WARDEN_TOOLS = [
 const TRACKS = [
   { id: 'warden', title: 'WARDEN', line: "the keeper's machine. for those who read source." },
   { id: 'lostworld', title: 'the lost world', line: 'a world, rebuilt from its colours.' },
-  { id: 'year', title: 'the year', line: 'not yet.' },
+  { id: 'year', title: 'the year', line: 'four seasons, in a language nobody taught you.' },
 ];
 
 const OBJECTS = [
@@ -112,7 +112,10 @@ export function renderExtras(app, { el }, open) {
 export function renderWarden(app, ui, data, storage) {
   showDock(ui.el);
   startMachine();
-  const machineHolder = ui.el('div');
+  // WARDEN's status light: the machine script fills #warden-machine with a cursor and a heartbeat dot.
+  const machineHolder = ui.el('div', 'warden-status');
+  machineHolder.title = 'WARDEN is running on this page';
+  machineHolder.append(ui.el('span', 'warden-status-label', 'WARDEN'));
   return renderTrackDesk(
     app,
     ui,

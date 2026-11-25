@@ -164,6 +164,31 @@ export const HELP = `WARDEN console. commands:
   save [name]               download the loaded file
   clear                     clear the screen`;
 
+const COMMANDS = ['help', 'req', 'b64', 'hex', 'num', 'xor', 'jwt', 'open', 'hexdump', 'insert', 'xorfile', 'unzip', 'save', 'clear'];
+
+// Levenshtein distance, small and plain: commands are a few letters long.
+function distance(a, b) {
+  let prev = [...Array(b.length + 1).keys()];
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+// The closest known command to a typo, or null when nothing is close (within two edits).
+export function nearestCommand(word) {
+  const w = String(word).toLowerCase();
+  let best = null;
+  let bestD = 3;
+  for (const c of COMMANDS) {
+    const d = distance(w, c);
+    if (d < bestD) [best, bestD] = [c, d];
+  }
+  return best;
+}
+
 // Runs one line. `state` holds { file: Uint8Array|null, name: string }. `io` supplies the parts that
 // touch the outside: fetch, pickFile, download. Resolves to the text to print.
 export async function runCommand(line, state, io) {
@@ -273,8 +298,10 @@ export async function runCommand(line, state, io) {
       needFile();
       io.download(state.file, rest[0] ?? state.name ?? 'file.bin');
       return `saved ${rest[0] ?? state.name ?? 'file.bin'}`;
-    default:
-      throw new Error(`unknown command: ${cmd}. try help`);
+    default: {
+      const near = nearestCommand(cmd);
+      throw new Error(`unknown command: ${cmd}.${near ? ` did you mean ${near}?` : ''} type help to see every command`);
+    }
   }
 }
 
@@ -294,7 +321,19 @@ export function mountConsole(el, { onMinimize } = {}) {
   input.autocapitalize = 'off';
   input.spellcheck = false;
   input.setAttribute('aria-label', 'console command');
+  input.placeholder = 'type a command, then press Enter';
   form.append(prompt, input);
+  // One-click starters for people who have never used a terminal.
+  const quick = el('div', 'console-quick');
+  for (const [label, line] of [['help', 'help'], ['example: base64', 'b64 dec V0FSREVO'], ['open a file', 'open'], ['clear', 'clear']]) {
+    const b = el('button', 'console-chip', label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      input.value = line;
+      form.requestSubmit();
+    });
+    quick.append(b);
+  }
   const title = el('div', 'console-title');
   title.append(el('span', '', "the keeper's console"));
   if (onMinimize) {
@@ -308,7 +347,7 @@ export function mountConsole(el, { onMinimize } = {}) {
       if (event.key === 'Escape') onMinimize();
     });
   }
-  panel.append(title, screen, form);
+  panel.append(title, screen, quick, form);
 
   const history = [];
   let back = 0;
@@ -316,7 +355,7 @@ export function mountConsole(el, { onMinimize } = {}) {
     screen.textContent += `${text}\n`;
     screen.scrollTop = screen.scrollHeight;
   };
-  print('WARDEN console 0.9. type help.');
+  print('WARDEN console 0.9.\ntype a command below and press Enter. new here? type help, or tap a button.\n↑ and ↓ bring back earlier commands. Esc folds the console away.');
 
   const io = {
     fetch: (url, init) => fetch(url, { ...init, mode: 'cors' }),

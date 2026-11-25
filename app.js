@@ -1,8 +1,10 @@
 import { openLink } from './lib/seal.js';
-import { FILES, GATE, SHRED, SCRIPT5, REPO, WARDEN, LOSTWORLD } from './data.js';
+import { FILES, GATE, SHRED, SCRIPT5, REPO, WARDEN, LOSTWORLD, YEAR } from './data.js';
 import { leaveWarden, renderExtras, renderWarden, toolsCard } from './extras.js';
 import { renderLostWorld } from './lostworld.js';
+import { renderYear } from './year.js';
 import { loadProgress, saveProgress, restore } from './progress.js';
+import { LOCKED, howToPlay, progressPips } from './trackdesk.js';
 
 // Stage 0 is the gate and opens the prologue. Stage N opens record N's page of the keeper's story.
 const STAGES = [{ sealed: GATE.sealed }, ...FILES];
@@ -65,18 +67,26 @@ function answerForm(label, placeholder, check) {
   const button = el('button', '', 'unseal');
   const message = el('p', 'reject');
   message.setAttribute('role', 'status');
-  form.append(input, button, message);
+  const hint = el('p', 'answer-hint', "one word. capitals, spaces and punctuation don't matter.");
+  form.append(input, button, message, hint);
+  let misses = 0;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const value = input.value;
-    if (!value.trim()) return;
+    if (!value.trim()) {
+      message.textContent = 'type a word first.';
+      input.focus();
+      return;
+    }
     button.disabled = true;
-    button.textContent = 'listening…';
+    button.textContent = 'checking…';
+    message.textContent = '';
     const ok = await check(value);
     if (!ok) {
+      misses += 1;
       button.disabled = false;
       button.textContent = 'unseal';
-      message.textContent = reject();
+      message.textContent = misses >= 3 ? `${reject()} stuck? look again at everything here, and at the tools in "what you'll need".` : reject();
       input.select();
     }
   });
@@ -228,6 +238,7 @@ function renderDesk() {
   head.append(
     el('h1', '', 'the archive'),
     el('p', '', opened === 5 ? 'every seal is broken.' : `${['five', 'four', 'three', 'two', 'one'][opened]} of five records still sealed.`),
+    progressPips(el, OBJECTS.map((_, i) => stateOf(i))),
     first,
   );
   const objects = el('section', 'objects');
@@ -238,7 +249,8 @@ function renderDesk() {
     button.type = 'button';
     const thing = el('div', 'thing');
     thing.append(el('div', object.kind), el('div', 'seal'));
-    button.append(thing, el('span', 'label', object.label), el('span', 'caption', state === 'locked' ? '' : object.caption));
+    if (state === 'ready') thing.append(el('span', 'badge', opened ? 'next' : 'start here'));
+    button.append(thing, el('span', 'label', object.label), el('span', 'caption', state === 'locked' ? LOCKED : object.caption));
     if (state === 'locked') {
       button.disabled = true;
       button.setAttribute('aria-label', `${object.label}, still under the others`);
@@ -247,7 +259,7 @@ function renderDesk() {
     }
     objects.append(button);
   });
-  app.append(extrasLink(), head, objects);
+  app.append(extrasLink(), head, howToPlay(el, opened === 0), objects);
 }
 
 // ---------- a record, opened ----------
@@ -391,10 +403,11 @@ const ui = { el, answerForm, storyPage, script };
 
 function route() {
   if (location.hash !== '#warden') leaveWarden(); // before the page is replaced, so the machine stays in the document
-  const open = { warden: Boolean(WARDEN), lostworld: Boolean(LOSTWORLD) };
+  const open = { warden: Boolean(WARDEN), lostworld: Boolean(LOSTWORLD), year: Boolean(YEAR) };
   if (location.hash === '#extras') return renderExtras(app, ui, open);
   if (location.hash === '#warden') return WARDEN ? renderWarden(app, ui, WARDEN, storage) : renderExtras(app, ui, open);
   if (location.hash === '#lostworld') return LOSTWORLD ? renderLostWorld(app, ui, LOSTWORLD, storage) : renderExtras(app, ui, open);
+  if (location.hash === '#year') return YEAR ? renderYear(app, ui, YEAR, storage) : renderExtras(app, ui, open);
   return pages.length ? renderDesk() : renderGate();
 }
 
