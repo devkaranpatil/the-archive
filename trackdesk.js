@@ -32,7 +32,7 @@ export function howToPlay(el, open) {
 // One track's desk: five sealed objects, each opened by its answer; progress under its own key.
 // Keeps WARDEN's behaviour: no redraw once the route has changed, dialogs close on route change,
 // a dialog closed while its seal breaks does not reopen, and opened logs carry the 'log' class.
-export async function renderTrackDesk(app, { el, answerForm, storyPage }, { title, route, key, objects, data, extras, className = '', page = null }, storage) {
+export async function renderTrackDesk(app, { el, answerForm, storyPage }, { title, route, key, objects, data, extras, intro = null, className = '', page = null }, storage) {
   const saved = loadProgress(storage, key);
   const logs = await restore(data.logs, saved, openLink);
   const answers = saved.slice(0, logs.length);
@@ -64,7 +64,7 @@ export async function renderTrackDesk(app, { el, answerForm, storyPage }, { titl
     const toArchive = el('a', 'plain back', 'back to the archive');
     toArchive.href = '#';
     nav.append(toExtras, toArchive);
-    app.append(head, howToPlay(el, logs.length === 0), ...extras(el), row, nav);
+    app.append(head, ...(intro ? intro(el) : []), howToPlay(el, logs.length === 0), ...extras(el), row, nav);
   };
 
   const openObject = (i) => {
